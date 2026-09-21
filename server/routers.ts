@@ -3,15 +3,30 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { COOKIE_NAME } from "@shared/const";
 import { publicProcedure, router } from "./_core/trpc";
 import { systemRouter } from "./_core/systemRouter";
-import { archiveStudent, createStudent, findStudent, getDashboard, importStudents, listImportBatches, listStudents, recordAttendance, updateStudent } from "./db";
+import { archiveStudent, createStudent, findStudent, getDashboard, importStudents, listImportBatches, listMasterlistHistory, listStudents, recordAttendance, resetCurrentRoster, STUDENT_ID_PATTERN, updateStudent } from "./db";
 
 const sessionSchema = z.enum(["morning_in", "morning_out", "afternoon_in", "afternoon_out"]);
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const studentInput = z.object({
-  studentId: z.string().min(1).max(32),
+  studentId: z.string().regex(STUDENT_ID_PATTERN, "ID number must be exactly 8 digits and start with 548"),
+  controlNo: z.string().max(32).optional(),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
+  middleName: z.string().max(100).optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  program: z.string().max(255).optional(),
   yearLevel: z.number().int().min(1).max(12),
+  barcode: z.string().max(64).optional(),
+});
+const importRowInput = z.object({
+  controlNo: z.string(),
+  studentId: z.string().max(32),
+  firstName: z.string().max(100),
+  lastName: z.string().max(100),
+  middleName: z.string(),
+  email: z.string(),
+  program: z.string(),
+  yearLevel: z.number(),
   barcode: z.string().max(64).optional(),
 });
 
@@ -50,7 +65,9 @@ export const appRouter = router({
   }),
   imports: router({
     history: publicProcedure.query(() => listImportBatches()),
-    students: publicProcedure.input(z.object({ filename: z.string().min(1), rows: z.array(studentInput) })).mutation(({ input }) => importStudents(input.filename, input.rows)),
+    students: publicProcedure.input(z.object({ filename: z.string().min(1), rows: z.array(importRowInput) })).mutation(({ input }) => importStudents(input.filename, input.rows)),
+    masterlists: publicProcedure.query(() => listMasterlistHistory()),
+    resetRoster: publicProcedure.input(z.object({ confirmation: z.literal("CLEAR CURRENT ROSTER") })).mutation(() => resetCurrentRoster()),
   }),
 });
 

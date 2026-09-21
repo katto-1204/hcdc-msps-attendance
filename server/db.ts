@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { attendance, importBatches, students, InsertUser, users } from "../drizzle/schema";
+import { attendance, importBatches, masterlistHistory, students, InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+export const STUDENT_ID_PATTERN = /^548\d{5}$/;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -77,7 +78,6 @@ export async function ensureDemoStudents() {
 export async function listStudents(query?: string) {
   const db = await getDb();
   if (!db) return [];
-  await ensureDemoStudents();
   const normalized = query?.trim();
   const where = normalized
     ? and(eq(students.status, "active"), or(like(students.studentId, `%${normalized}%`), like(students.firstName, `%${normalized}%`), like(students.lastName, `%${normalized}%`)))
@@ -88,7 +88,6 @@ export async function listStudents(query?: string) {
 export async function findStudent(identifier: string) {
   const db = await getDb();
   if (!db) return undefined;
-  await ensureDemoStudents();
   const value = identifier.trim();
   const result = await db.select().from(students).where(and(eq(students.status, "active"), or(eq(students.studentId, value), eq(students.barcode, value)))).limit(1);
   return result[0];
@@ -130,14 +129,14 @@ export async function recordAttendance(identifier: string, session: "morning_in"
   return { status: "recorded" as const, student, record: { attendanceDate: date, session, recordedAt } };
 }
 
-export async function createStudent(input: { studentId: string; firstName: string; lastName: string; yearLevel: number; barcode?: string }) {
+export async function createStudent(input: { studentId: string; controlNo?: string; firstName: string; lastName: string; middleName?: string; email?: string; program?: string; yearLevel: number; barcode?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   await db.insert(students).values({ ...input, barcode: input.barcode || input.studentId.replace(/-/g, "") });
   return findStudent(input.studentId);
 }
 
-export async function updateStudent(id: number, input: { studentId: string; firstName: string; lastName: string; yearLevel: number; barcode?: string }) {
+export async function updateStudent(id: number, input: { studentId: string; controlNo?: string; firstName: string; lastName: string; middleName?: string; email?: string; program?: string; yearLevel: number; barcode?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   await db.update(students).set({ ...input, barcode: input.barcode || input.studentId.replace(/-/g, "") }).where(eq(students.id, id));
@@ -152,17 +151,19 @@ export async function archiveStudent(id: number) {
   return { success: true };
 }
 
-export async function importStudents(filename: string, rows: Array<{ studentId: string; firstName: string; lastName: string; yearLevel: number; barcode?: string }>) {
+export async function importStudents(filename: string, rows: Array<{ controlNo: string; studentId: string; firstName: string; lastName: string; middleName: string; email: string; program: string; yearLevel: number; barcode?: string }>) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   let duplicates = 0;
   let invalidRecords = 0;
+  let rejectedRows = 0;
   let successfullyImported = 0;
   const seen = new Set<string>();
   for (const row of rows) {
     const id = row.studentId.trim();
-    if (!id || !row.firstName.trim() || !row.lastName.trim() || !Number.isFinite(row.yearLevel) || row.yearLevel < 1) {
+    if (!row.controlNo.trim() || !STUDENT_ID_PATTERN.test(id) || !row.firstName.trim() || !row.lastName.trim() || !row.middleName.trim() || !row.email.trim() || !row.program.trim() || !Number.isFinite(row.yearLevel) || row.yearLevel < 1) {
       invalidRecords += 1;
+      rejectedRows += 1;
       continue;
     }
     if (seen.has(id) || (await findStudent(id))) {
@@ -174,11 +175,27 @@ export async function importStudents(filename: string, rows: Array<{ studentId: 
     successfullyImported += 1;
   }
   await db.insert(importBatches).values({ filename, studentsFound: rows.length, successfullyImported, duplicates, invalidRecords, status: invalidRecords > 0 ? "review" : "completed" });
-  return { studentsFound: rows.length, successfullyImported, duplicates, invalidRecords };
+  await db.insert(masterlistHistory).values({ filename, totalRows: rows.length, importedRows: successfullyImported, rejectedRows, duplicateRows: duplicates, status: successfullyImported > 0 ? "active" : "rejected" });
+  return { studentsFound: rows.length, successfullyImported, duplicates, invalidRecords, rejectedRows };
 }
 
 export async function listImportBatches() {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(importBatches).orderBy(desc(importBatches.createdAt)).limit(10);
+}
+
+export async function listMasterlistHistory() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(masterlistHistory).orderBy(desc(masterlistHistory.createdAt)).limit(20);
+}
+
+export async function resetCurrentRoster() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.delete(attendance);
+  await db.delete(students);
+  await db.update(masterlistHistory).set({ status: "archived" }).where(eq(masterlistHistory.status, "active"));
+  return { success: true };
 }
