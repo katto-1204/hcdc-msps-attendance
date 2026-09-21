@@ -1,19 +1,10 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
+/** Core Manus-authenticated user table. */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
+  name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
@@ -22,7 +13,42 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const students = mysqlTable("students", {
+  id: int("id").autoincrement().primaryKey(),
+  studentId: varchar("studentId", { length: 32 }).notNull().unique(),
+  firstName: varchar("firstName", { length: 100 }).notNull(),
+  lastName: varchar("lastName", { length: 100 }).notNull(),
+  yearLevel: int("yearLevel").notNull(),
+  barcode: varchar("barcode", { length: 64 }),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const attendance = mysqlTable("attendance", {
+  id: int("id").autoincrement().primaryKey(),
+  studentId: int("studentId").notNull(),
+  attendanceDate: varchar("attendanceDate", { length: 10 }).notNull(),
+  session: mysqlEnum("session", ["morning_in", "morning_out", "afternoon_in", "afternoon_out"]).notNull(),
+  recordedAt: timestamp("recordedAt").notNull(),
+  recordedBy: int("recordedBy"),
+}, (table) => ({
+  studentDateSession: uniqueIndex("student_date_session").on(table.studentId, table.attendanceDate, table.session),
+}));
+
+export const importBatches = mysqlTable("importBatches", {
+  id: int("id").autoincrement().primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  studentsFound: int("studentsFound").default(0).notNull(),
+  successfullyImported: int("successfullyImported").default(0).notNull(),
+  duplicates: int("duplicates").default(0).notNull(),
+  invalidRecords: int("invalidRecords").default(0).notNull(),
+  status: mysqlEnum("status", ["completed", "review"]).default("completed").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-
-// TODO: Add your tables here
+export type Student = typeof students.$inferSelect;
+export type Attendance = typeof attendance.$inferSelect;
+export type ImportBatch = typeof importBatches.$inferSelect;
