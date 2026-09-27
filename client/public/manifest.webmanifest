@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "HCDC-MSPS Attendance System",
+  "short_name": "MSPS Attendance",
+  "description": "Student attendance and roster management for HCDC-MSPS.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f9f7",
+  "theme_color": "#174a3a",
+  "icons": [
+    { "src": "/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
