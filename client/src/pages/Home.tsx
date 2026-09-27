@@ -2,6 +2,7 @@ import { LoadingModal } from "@/components/LoadingModal";
 import { localApi } from "@/lib/local-api";
 import { localStore } from "@/lib/local-store";
 import { parseMasterlist, studentIssues, STUDENT_ID_PATTERN, type ImportRow } from "@/lib/student-import";
+import { exportStyledAttendanceExcel } from "@/lib/excel-export";
 import { ImportStudentsPanel } from "@/components/ImportStudentsPanel";
 import { TableSkeleton, ListSkeleton } from "@/components/LoadingSkeletons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -214,52 +215,8 @@ export default function Home() {
     setIsExporting(true);
     try {
       const records = dashboard?.records || [];
-      const xlsxMod = await import("xlsx");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const XLSX = (xlsxMod as any).default ?? xlsxMod;
-
-      const wb = XLSX.utils.book_new();
-      const header = ["Date", "Time", "ID Number", "Student Name", "Year Level", "Session"];
-      const colWidths = [
-        { wch: 16 }, // Date
-        { wch: 16 }, // Time
-        { wch: 18 }, // ID Number
-        { wch: 32 }, // Student Name
-        { wch: 14 }, // Year Level
-        { wch: 18 }, // Session
-      ];
-
-      const makeSheetRows = (recs: typeof records) => recs.map((row) => [
-        row.attendanceDate,
-        formatTime(row.recordedAt),
-        row.studentNumber,
-        `${row.firstName} ${row.lastName}`,
-        row.yearLevel != null ? `Year ${row.yearLevel}` : "N/A",
-        displaySession(row.session),
-      ]);
-
-      // 1. All Sessions (Master Tab)
-      const masterWs = XLSX.utils.aoa_to_sheet([header, ...makeSheetRows(records)]);
-      masterWs["!cols"] = colWidths;
-      XLSX.utils.book_append_sheet(wb, masterWs, "All Sessions");
-
-      // 2. Separate Tab Sheet Per Session
-      const sessionTabs: Array<{ key: Session; name: string }> = [
-        { key: "morning_in", name: "Morning In" },
-        { key: "morning_out", name: "Morning Out" },
-        { key: "afternoon_in", name: "Afternoon In" },
-        { key: "afternoon_out", name: "Afternoon Out" },
-      ];
-
-      for (const tab of sessionTabs) {
-        const sessionRecords = records.filter((r) => r.session === tab.key);
-        const ws = XLSX.utils.aoa_to_sheet([header, ...makeSheetRows(sessionRecords)]);
-        ws["!cols"] = colWidths;
-        XLSX.utils.book_append_sheet(wb, ws, tab.name);
-      }
-
-      XLSX.writeFile(wb, `HCDC-MSPS-Attendance-${date}.xlsx`);
-      toast.success("Excel sheet exported!", { description: `Exported ${records.length} records split into 5 tab sheets.` });
+      exportStyledAttendanceExcel(records, date);
+      toast.success("Styled Excel sheet exported!", { description: `Exported ${records.length} formatted records split into 5 tab sheets.` });
     } catch (err) {
       toast.error("Export failed", { description: String(err) });
     } finally {
