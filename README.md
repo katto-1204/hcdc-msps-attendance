@@ -112,10 +112,9 @@ Open `http://localhost:3000`, wait for the **Ready for offline use** status, and
 
 Open **Students**, choose **Add student**, and provide:
 
-- Student ID: exactly eight digits beginning with `548` (for example, `54800001`)
-- First name
-- Last name
-- Year level: a whole number from 1 to 12
+- Student ID: the actual masterlist ID, with any prefix (1–64 characters without spaces)
+- First name and/or last name: at least one is required
+- Year level: blank when unknown, or a whole number from 1 to 12
 - Barcode: optional; defaults to the student ID when omitted
 
 Student IDs and barcodes must be unique, including values belonging to archived students.
@@ -127,7 +126,7 @@ Open **Import students** and select a supported spreadsheet. The first worksheet
 | Required column | Description |
 | --- | --- |
 | `CONTROL NO.` | Institutional control number |
-| `ID NUMBER` | Eight-digit student ID beginning with `548` |
+| `ID NUMBER` | Actual student ID; any prefix is accepted and leading zeros are preserved |
 | `FIRST NAME` | Student's given name |
 | `LAST NAME` | Student's family name |
 | `MIDDLE NAME` | Student's middle name |
@@ -135,7 +134,9 @@ Open **Import students** and select a supported spreadsheet. The first worksheet
 | `PROGRAM` | Academic program |
 | `YEAR LEVEL` | Numeric year level |
 
-The app previews the file before import and reports imported, duplicate, and rejected rows. Imports commit locally as a single transaction to avoid partially written batches.
+The format follows `1ST SEM MASTERLIST.xlsx`. All eight headers are required, but middle name, email, program, control number, and year level values may be blank. At least one name and an ID are needed. The first worksheet with matching headers is used; the supplied workbook's duplicate second sheet is not imported again. Footer notes after “nothing follows” are excluded. Empty formatted columns are not scanned.
+
+The app previews the file before import and reports imported, duplicate, and rejected rows. Imports commit locally as a single transaction. Successful imports clear the search and open the student directory, which displays the masterlist details. In Import students, use **Download rejected rows** beside an import to get original values, Excel row numbers, and correction reasons. Correct those values and upload the CSV again. Older imports without saved row details need their source file re-uploaded to generate a report.
 
 ### 3. Record attendance
 
@@ -263,7 +264,7 @@ This is expected. IndexedDB is isolated by browser profile and origin. Use the s
 
 ### A student cannot be added or imported
 
-Check that the ID contains eight digits and begins with `548`, the year level is between 1 and 12, and neither the ID nor barcode already belongs to an active or archived student.
+Check that the actual ID is present without spaces, at least one name is provided, the year level is blank or between 1 and 12, and neither the ID nor barcode already belongs to an active or archived student. No prefix restriction applies. Download the rejected-row report from import history for the specific Excel row and reason.
 
 ### Attendance is reported as a duplicate
 

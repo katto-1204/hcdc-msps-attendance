@@ -18,7 +18,7 @@ describe("offline attendance storage", () => {
     await localStore.create(student);
     await expect(localStore.create(student)).rejects.toThrow("already exists");
     await expect(localStore.create({ ...student, studentId: "54800002", barcode: student.studentId })).rejects.toThrow("already exists");
-    await expect(localStore.create({ ...student, studentId: "123" })).rejects.toThrow("8 digits");
+    await expect(localStore.create({ ...student, studentId: "" })).rejects.toThrow("Missing ID NUMBER");
     expect(await localStore.list()).toHaveLength(1);
   });
   it("serializes simultaneous attendance scans and preserves timestamps", async () => {
@@ -43,7 +43,7 @@ describe("offline attendance storage", () => {
   });
   it("imports offline, counts duplicates and invalid rows, preserves history on reset", async () => {
     const row = { ...student, controlNo: "1", middleName: "Reyes", email: "anna@hcdc.edu.ph", program: "BSIT" };
-    const result = await localStore.importStudents({ filename: "test.csv", rows: [row, row, { ...row, studentId: "bad" }] });
+    const result = await localStore.importStudents({ filename: "test.csv", rows: [row, row, { ...row, studentId: "" }] });
     expect(result).toMatchObject({ successfullyImported: 1, duplicates: 1, invalidRecords: 1 });
     await expect(localStore.resetRoster({ confirmation: "wrong" })).rejects.toThrow();
     expect(await localStore.list()).toHaveLength(1);
